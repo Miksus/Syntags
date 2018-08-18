@@ -45,7 +45,10 @@ class WordFeatureExtractor(BaseEstimator, TransformerMixin):
 
     
     def _transform_sentences(self, X, extractor_func):
-        'Transforms list of sentences to list of dictionaries'
+        '''Transforms list of sentences to list of dictionaries
+        >>> [['Word','word'], ['Word','word'], ...]
+            return [{...}, {...}, {...}, {...}, ...]
+        '''
         
         X_transformed = []
         for sentence in X:
@@ -56,15 +59,46 @@ class WordFeatureExtractor(BaseEstimator, TransformerMixin):
         return X_transformed
 
     def _to_sentences(self, obj, columns=None):
-        'Return list of sentences'
+        '''Return list of sentences
+
+
+        >>> obj = [['Word','word'], ['Word','word']]
+        OR
+        >>> obj = pd.Series([['Word','word'], ['Word','word']])
+        OR
+        >>> obj = pd.Series(['Word','word', 'Word','word'], index=[1,1,2,2])
+        return [['Word','word'], ['Word','word']]
+
+
+        >>> obj = pd.DataFrame({
+                'Text':['Word', 'word', 'Word', 'word'],
+                'Pretag':[tag,tag,tag,tag],
+                'feat1':[11,12,13,14], 'feat2':[21,22,23,24]},
+                index=[1,1,2,2])
+            columns = ['Text', 'Pretag']
+        return {'Text'[['Word','word'], ['Word','word']], 'Pretag'[[tag,tag],[tag,tag]]}, 
+                [{'feat1':11, 'feat2':21}, {'feat1':12, 'feat2':22},{'feat1':13, 'feat2':23},{'feat1':14, 'feat2':24}]
+
+                
+        '''
+        def is_series_of_lists(series):
+            # series = pd.Series([[W,w,w],[W,w,w]...])
+            return series.apply(lambda x: isinstance(x, list)).any()
+
+        def is_sentence_id_index(index):
+            return (not isinstance(index, pd.MultiIndex) and(index >= 0).all()
+                    and index.duplicated(keep=False).mean() >0.5)
 
         def series_to_sentences(series):
-            # Inner function
-            if series.apply(lambda x: isinstance(x, list)).all():
+            if is_series_of_lists(series):
                 return series.tolist()
+            
+            elif is_sentence_id_index(series.index):
+                grouped_sentences = series.groupby(obj.index, sort=False)
+                return grouped_sentences.apply(lambda sent: sent.values.tolist()).tolist()
+            
             else:
-                return series.groupby(obj.index, sort=False).apply(lambda sent: sent.values.tolist()).tolist()
-
+                raise NotImplementedError('No conversion for series structure')
 
         if isinstance(obj, (list, tuple)):
             sents = obj
@@ -78,6 +112,8 @@ class WordFeatureExtractor(BaseEstimator, TransformerMixin):
             sents = {col:series_to_sentences(obj[col])
                      for col in columns}
             other = obj.drop(columns=columns).to_dict('records')
+        else:
+            raise TypeError('Cannot turn {} to sentences'.format(type(obj)))
 
         return sents, other
 
