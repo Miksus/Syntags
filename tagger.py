@@ -1,7 +1,7 @@
 from sentence_transformer import WordFeatureExtractor
 
 
-def Tagger:
+class Tagger:
 
     def __init__(self, estimator=None, **kwargs):
         if estimator is None:
